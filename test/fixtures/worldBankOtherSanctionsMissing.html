@@ -1,0 +1,22 @@
+<!--
+Synthetic fixture simulating a page-structure change: no table whose header
+row matches the 4 "Other Sanctions" header patterns exists. Used to verify
+the extraction-integrity-failure / degraded path in worldBankDebarredFirms.test.ts.
+-->
+<!doctype html>
+<html>
+    <body>
+        <table>
+            <tbody>
+                <tr>
+                    <td>Unrelated Column A</td>
+                    <td>Unrelated Column B</td>
+                </tr>
+                <tr>
+                    <td>foo</td>
+                    <td>bar</td>
+                </tr>
+            </tbody>
+        </table>
+    </body>
+</html>

@@ -1,0 +1,21 @@
+{
+    "$schema": "https://apify.com/schemas/v1/actor.ide.json",
+    "actorSpecification": 1,
+    "name": "actor-20-mdb-procurement-monitor",
+    "title": "Multilateral Development Bank Procurement Monitor",
+    "description": "Extracts the World Bank's public Procurement Notices API and its 'Other Sanctions' debarment sub-table, normalized to the fleet's 18-field UMS. ADB (Cloudflare-gated) and IDB (Power BI-only, CKAN API robots.txt-blocked) were live-researched and honestly deferred, not force-scraped - see README.md.",
+    "version": "2.0",
+    "buildTag": "latest",
+    "minMemoryMbytes": 256,
+    "maxMemoryMbytes": 512,
+    "meta": {
+        "templateId": "ts-crawlee-cheerio",
+        "generatedBy": "Claude Code with Claude Sonnet 5"
+    },
+    "inputSchema": "./input_schema.json",
+    "outputSchema": "./output_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json"
+    },
+    "changelog": "../CHANGELOG.md"
+}

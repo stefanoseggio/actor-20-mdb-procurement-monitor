@@ -1,0 +1,58 @@
+{
+    "$schema": "https://apify.com/schemas/v1/input.ide.json",
+    "title": "Multilateral Development Bank Procurement Monitor Configuration",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "sources": {
+            "title": "Sources to extract",
+            "type": "array",
+            "description": "worldBankProcurementNotices = the live World Bank Procurement Notices API (search.worldbank.org). worldBankDebarredFirms = the World Bank's static 'Other Sanctions' debarment sub-table (worldbank.org). ADB and IDB are NOT selectable here - both were live-researched and found gated/non-compliant for v1 (Cloudflare/WAF for ADB; Power BI embed + robots.txt-blocked API for IDB) - see README.md.",
+            "editor": "select",
+            "items": {
+                "type": "string",
+                "enum": ["worldBankProcurementNotices", "worldBankDebarredFirms"],
+                "enumTitles": [
+                    "World Bank Procurement Notices",
+                    "World Bank Other Sanctions (debarred-firms sub-table)"
+                ]
+            },
+            "default": ["worldBankProcurementNotices", "worldBankDebarredFirms"],
+            "minItems": 1
+        },
+        "maxItemsPerSource": {
+            "title": "Max records per source",
+            "type": "integer",
+            "description": "Hard cap on how many records to return per selected source this run. For worldBankProcurementNotices this bounds rows/os pagination against a live corpus of several hundred thousand notices; for worldBankDebarredFirms it is a no-op ceiling since the 'Other Sanctions' sub-table is a single small page.",
+            "default": 100,
+            "minimum": 1,
+            "maximum": 5000
+        },
+        "onlyNew": {
+            "title": "Delta mode - only new or changed records since last run",
+            "type": "boolean",
+            "description": "When enabled, persists a content fingerprint per Procurement Notice between runs (in this actor's own named key-value store) and returns only notices that are new since the last run OR whose notice_status or other tracked fields changed since they were last seen - notices identical to last time are skipped. is_new is always populated (true/false) regardless of this setting. Only applies to worldBankProcurementNotices - Other Sanctions has no delta-tracking concept (a small static snapshot page, not a dated/paginated feed). The World Bank Procurement Notices API documents no server-side 'since' filter, so pagination always walks from the start of the result set each run - onlyNew filters client-side after the fact rather than early-stopping pagination.",
+            "default": false
+        },
+        "countryFilter": {
+            "title": "Filter by project country (procurement notices only)",
+            "type": "array",
+            "description": "Optional client-side filter on project_ctry_name (e.g. 'Kenya', 'India'). The World Bank API documents no server-side country filter parameter, so this is applied after fetching each page.",
+            "editor": "stringList"
+        },
+        "noticeTypeFilter": {
+            "title": "Filter by notice type (procurement notices only)",
+            "type": "array",
+            "description": "Optional client-side filter on notice_type (e.g. 'Invitation for Bids', 'Request for Expression of Interest', 'Contract Award'). Applied after fetching each page, same caveat as countryFilter.",
+            "editor": "stringList"
+        },
+        "dateRange": {
+            "title": "Filter by recency (procurement notices only)",
+            "type": "string",
+            "description": "Optionally restrict procurement-notice results to records whose noticedate falls within this window. Not applied to worldBankDebarredFirms records (that source has no reliable per-record publish date field in the static sub-table).",
+            "editor": "select",
+            "enum": ["24h", "7d", "30d"],
+            "enumTitles": ["Last 24 hours", "Last 7 days", "Last 30 days"]
+        }
+    }
+}

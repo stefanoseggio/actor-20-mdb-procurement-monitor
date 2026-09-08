@@ -1,0 +1,106 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "actorSpecification": 1,
+    "title": "Dataset Schema",
+    "fields": {
+        "type": "object",
+        "properties": {
+            "record_id": {
+                "title": "Record ID",
+                "type": "string",
+                "description": "Stable across runs. Prefixed per sub-source ('wb-procnotice-<id>', 'wb-sanction-<slug>') since this single actor emits more than one native record shape."
+            },
+            "event_type": {
+                "title": "Event Type",
+                "type": "string",
+                "description": "Procurement notices: NEW_LISTING on first sighting, STATUS_CHANGE if notice_status changed since last seen, UPDATED if some other tracked field changed, SNAPSHOT_NO_DIFF if identical (only delivered when onlyNew=false). SANCTION for every Other Sanctions entry (no delta concept on that static-snapshot sub-source). SNAPSHOT_NO_DIFF also used for the degraded-extraction fallback notice."
+            },
+            "scraped_at": {
+                "title": "Scraped At",
+                "type": "string",
+                "description": "ISO-8601 timestamp of this extraction"
+            },
+            "is_new": {
+                "title": "Is New",
+                "type": ["boolean", "null"],
+                "description": "true/false in delta mode (onlyNew input), null when delta mode is off"
+            },
+            "source_url": { "title": "Source URL", "type": ["string", "null"] },
+            "recipient_or_defendant_name": {
+                "title": "Recipient / Defendant Name",
+                "type": ["string", "null"],
+                "description": "null for procurement notices (no recipient/winner field is present on this WB endpoint - see README); the sanctioned firm name for Other Sanctions records"
+            },
+            "entity_identifier_native": { "title": "Entity Identifier (native)", "type": ["string", "null"] },
+            "value_native": {
+                "title": "Value (native)",
+                "type": ["string", "null"],
+                "description": "Always null - neither source exposes a monetary value field (documented honestly, not a parsing gap)"
+            },
+            "value_currency": { "title": "Value Currency", "type": ["string", "null"] },
+            "value_usd_normalized": { "title": "Value USD Normalized", "type": ["number", "null"] },
+            "effective_date_iso": {
+                "title": "Effective Date (ISO)",
+                "type": ["string", "null"],
+                "description": "submission_deadline_date for procurement notices; parsed sanction-imposition date for Other Sanctions (null when the source text isn't a cleanly parseable date, e.g. 'Ongoing')"
+            },
+            "publish_date_iso": {
+                "title": "Publish Date (ISO)",
+                "type": ["string", "null"],
+                "description": "Parsed from noticedate (procurement notices only)"
+            },
+            "category_or_type": {
+                "title": "Category / Type",
+                "type": ["string", "null"],
+                "description": "notice_type for procurement notices; the 'Sanction Imposed' text for Other Sanctions"
+            },
+            "status_or_estado": {
+                "title": "Status",
+                "type": ["string", "null"],
+                "description": "notice_status for procurement notices; the raw 'Date of Imposition of Sanction' cell text for Other Sanctions (mixes dates and statuses like 'Ongoing' in the source - kept verbatim rather than force-split)"
+            },
+            "awarding_or_regulating_agency": { "title": "Awarding / Regulating Agency", "type": ["string", "null"] },
+            "jurisdiction": {
+                "title": "Jurisdiction",
+                "type": "string",
+                "description": "'WB' for both World Bank sub-sources. Not one of the fleet's 11 closed JurisdictionCode values - this is a supranational institution, not a national/subnational government."
+            },
+            "source_document_url": { "title": "Source Document URL", "type": ["string", "null"] },
+            "reference_number": { "title": "Reference Number", "type": ["string", "null"] }
+        }
+    },
+    "views": {
+        "overview": {
+            "title": "Overview",
+            "transformation": {
+                "fields": [
+                    "event_type",
+                    "record_id",
+                    "recipient_or_defendant_name",
+                    "category_or_type",
+                    "status_or_estado",
+                    "publish_date_iso",
+                    "effective_date_iso",
+                    "awarding_or_regulating_agency",
+                    "jurisdiction",
+                    "source_url"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "columns": [
+                    { "label": "Type", "format": "text", "field": "event_type" },
+                    { "label": "Record ID", "format": "text", "field": "record_id" },
+                    { "label": "Recipient / Firm", "format": "text", "field": "recipient_or_defendant_name" },
+                    { "label": "Category", "format": "text", "field": "category_or_type" },
+                    { "label": "Status", "format": "text", "field": "status_or_estado" },
+                    { "label": "Published", "format": "text", "field": "publish_date_iso" },
+                    { "label": "Effective / Deadline", "format": "text", "field": "effective_date_iso" },
+                    { "label": "Agency", "format": "text", "field": "awarding_or_regulating_agency" },
+                    { "label": "Jurisdiction", "format": "text", "field": "jurisdiction" },
+                    { "label": "Source", "format": "text", "field": "source_url" }
+                ]
+            }
+        }
+    }
+}
