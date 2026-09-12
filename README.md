@@ -1,230 +1,191 @@
-# Multilateral Development Bank Procurement Monitor
+# World Bank Procurement Intelligence - Tenders & Debarment Monitor (Global Development Finance)
 
-Extracts procurement notices and debarment/sanction records from Multilateral
-Development Banks, normalized to a shared 18-field Unified Master Schema
-(UMS), with real cross-run change detection on the Procurement Notices
-sub-source (new/changed/status-changed - see "Delta mode" below).
+## Executive Value Proposition
 
-## What's live in v1
+Checking the World Bank's procurement portal and its debarred-firms page by
+hand means repeat manual visits, no change history between checks, and no
+structured export to plug into a CRM, BI tool, or compliance workflow. This
+actor replaces that manual routine: it polls the World Bank's public
+Procurement Notices API and its "Other Sanctions" debarment sub-table on
+whatever schedule you set, normalizes every record into one consistent
+18-field schema, and — when delta mode is enabled — tells you exactly which
+notices are new, have changed status, or were otherwise updated since your
+last run, so you review only what actually moved rather than re-scanning the
+whole list every time.
 
-| Source                                                 | Host                         | Mechanism                                           | Status                                                   |
-| ------------------------------------------------------ | ---------------------------- | --------------------------------------------------- | -------------------------------------------------------- |
-| World Bank Procurement Notices                         | `search.worldbank.org`       | Public, unauthenticated JSON API                    | **Live**                                                 |
-| World Bank "Other Sanctions"                           | `www.worldbank.org`          | Static HTML `<table>` (header-anchored)             | **Live**                                                 |
-| World Bank "Debarred & Cross-Debarred Firms" (Table 1) | `www.worldbank.org`          | Client-side Kendo grid over an undocumented gateway | **Not scraped** (see below)                              |
-| Asian Development Bank (ADB) procurement               | `adb.org`                    | —                                                   | **Deferred** (Cloudflare/WAF-gated)                      |
-| Inter-American Development Bank (IDB/BID) procurement  | `iadb.org` / `data.iadb.org` | —                                                   | **Deferred** (Power BI embed; API blocked by robots.txt) |
+**Scope note:** this actor covers the **World Bank only**. The Asian
+Development Bank (ADB) and Inter-American Development Bank (IDB/BID) were
+both live-researched during development and are deliberately **out of
+scope** for this version — ADB's procurement pages sit behind a
+Cloudflare/WAF challenge on every path tested, and IDB's notices render
+exclusively through an embedded Power BI report whose only structured data
+route (a CKAN API at `data.iadb.org`) is explicitly disallowed in that
+site's own `robots.txt`. Neither was force-scraped or bypassed; both are
+honestly deferred. See **Reliability** below for how that finding was
+verified.
 
-## World Bank Procurement Notices API
+## Use cases
 
-`GET https://search.worldbank.org/api/v2/procnotices?format=json&rows=<n>&os=<offset>`
+1. **Bid-opportunity tracking for contractors and consultants.** Filter by
+   country and notice type (e.g. `Invitation for Bids`,
+   `Request for Expression of Interest`) to get a structured feed of live
+   World Bank-financed tenders instead of checking the procurement portal
+   page by page.
+2. **Vendor debarment and compliance screening.** Pull the "Other Sanctions"
+   sub-table — sanctioned-firm name, sanction type, and grounds — as a
+   structured feed to screen counterparties or subcontractors before
+   signing, without manually reading the World Bank's debarred-firms page.
+3. **Development-finance market intelligence.** Track procurement method
+   mix, country distribution, and notice-type volume over time (via
+   `category_or_type`, `awarding_or_regulating_agency`, and
+   `status_or_estado`) for market-sizing or business-development research
+   into World Bank-financed project pipelines.
 
-Confirmed live and unauthenticated with a real GET during development
-(2026-09-07). Envelope: `{rows, os, page, total, procnotices: [...]}`. Field
-list is exactly as documented in the task brief and verified against the
-real response - see `src/schemas.ts` (`WorldBankProcNoticeRawSchema`) and
-`test/fixtures/worldBankProcNotices.json`, which contains real (trimmed)
-records captured from that response.
+## Input
 
-No documented server-side filter beyond `rows`/`os` pagination exists, so
-`countryFilter`, `noticeTypeFilter`, and `dateRange` (actor input) are all
-applied client-side after each page is fetched (`src/sources/worldBankProcurementNotices.ts`).
+Example input (matches `.actor/input_schema.json`):
 
-This endpoint carries **no winner/bidder-name field and no monetary value
-field** - `recipient_or_defendant_name`, `value_native`, `value_currency`,
-and `value_usd_normalized` are always `null` for these records. That's an
-honest "not applicable," not a parsing gap (a separate WB "Contract Awards"
-dataset carries award values; it's out of scope here).
+```json
+{
+    "sources": ["worldBankProcurementNotices", "worldBankDebarredFirms"],
+    "maxItemsPerSource": 100,
+    "onlyNew": false,
+    "countryFilter": ["Kenya", "India"],
+    "noticeTypeFilter": ["Invitation for Bids"],
+    "dateRange": "30d"
+}
+```
 
-## World Bank Debarred Firms page
+| Field              | Type            | Default                                                          | Description                                                                                                                                                                                        |
+| ------------------ | --------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sources`           | array (enum)    | `["worldBankProcurementNotices", "worldBankDebarredFirms"]`      | Which sub-source(s) to extract. `worldBankProcurementNotices` = the live Procurement Notices API; `worldBankDebarredFirms` = the "Other Sanctions" debarment sub-table. ADB/IDB are not selectable — see Scope note above. |
+| `maxItemsPerSource` | integer          | `100`                                                              | Hard cap on records returned per selected source this run (1-5000). For procurement notices this bounds `rows`/`os` pagination; for debarred firms it's a no-op ceiling since that sub-table is a single small page. |
+| `onlyNew`           | boolean          | `false`                                                            | Delta mode. When `true`, only procurement notices new or changed since the last run are returned (identical ones are skipped). Has no effect on Other Sanctions, which has no delta concept.       |
+| `countryFilter`     | array of strings | none                                                               | Client-side filter on `project_ctry_name` (procurement notices only). The World Bank API documents no server-side country filter, so this is applied after each page is fetched.                  |
+| `noticeTypeFilter`  | array of strings | none                                                               | Client-side filter on `notice_type` (procurement notices only), e.g. `Invitation for Bids`, `Request for Expression of Interest`, `Contract Award`.                                                |
+| `dateRange`         | enum             | none                                                               | Restrict procurement notices to `24h` / `7d` / `30d` based on `noticedate`. Not applied to Other Sanctions records (no reliable per-record publish date in that sub-table).                        |
 
-`https://www.worldbank.org/en/projects-operations/procurement/debarred-firms`
+## Output
 
-This page renders **two** tables with very different character, confirmed by
-directly inspecting the live page's HTML/inline JS on 2026-09-07:
+Every record — from either sub-source — is normalized to the same 18-field
+schema. Two real examples, one per sub-source:
 
-- **Table 1** ("Debarred & Cross-Debarred Firms and Individuals") is a Kendo
-  UI grid (`$("#k-debarred-firms").kendoGrid(...)`). Its data source
-  (`transport.read.url`) is
-  `https://apigwext.worldbank.org/dvsvc/v1.0/json/APPLICATION/ADOBE_EXPRNCE_MGR/FIRM/SANCTIONED_FIRM`
-    - an **undocumented internal API gateway**, confirmed present verbatim in
-      the page's inline `<script>`. Per this fleet's compliance doctrine, an
-      undocumented gateway is not treated as a source, so **Table 1 is never
-      queried** by this actor, directly or indirectly.
-- **Table 2** ("Other Sanctions") **is** present in the plain-fetched static
-  HTML as a real `<table>` with genuine semantic header text ("Name of Firm
-  & Address", "Date of Imposition of Sanction", "Sanction Imposed",
-  "Grounds"). This is the only table this actor extracts -
-  `src/sources/worldBankDebarredFirms.ts` locates it by matching those header
-  strings (content-anchored, not a fabricated CSS class - the page defines
-  none for this hand-authored table).
+**Procurement notice** (World Bank Procurement Notices API):
 
-**Extraction-integrity handling**: if the header row can't be found, or it's
-found but zero data rows parse out of it, that is treated as an
-**extraction-integrity failure** - never silently reported as "no debarred
-firms/sanctions exist." In that case the actor pushes one `SNAPSHOT_NO_DIFF`
-record (`umsNormalizer.buildDebarredFirmsDegradedNotice`) pointing at the
-World Bank's own static "Notes on Debarred Firms and Individuals" PDF
-(`https://thedocs.worldbank.org/en/doc/387181466627871302-0290022021/original/WorldBankNotesonDebarredFirmsandIndividuals.pdf`)
-as a documented fallback reference, instead of the undocumented gateway.
+```json
+{
+    "record_id": "wb-procnotice-OP00467118",
+    "event_type": "NEW_LISTING",
+    "scraped_at": "2026-09-08T09:14:22.481Z",
+    "is_new": true,
+    "source_url": "https://search.worldbank.org/api/v2/procnotices?format=json&id=OP00467118",
+    "recipient_or_defendant_name": null,
+    "entity_identifier_native": "KE-MOTI-566726-CS-QCBS",
+    "value_native": null,
+    "value_currency": null,
+    "value_usd_normalized": null,
+    "effective_date_iso": "2026-10-06T00:00:00Z",
+    "publish_date_iso": "2026-09-05T00:00:00.000Z",
+    "category_or_type": "Request for Expression of Interest",
+    "status_or_estado": "Published",
+    "awarding_or_regulating_agency": "Ministry of Transport and Infrastructure",
+    "jurisdiction": "WB",
+    "source_document_url": "http://www.transport.go.ke",
+    "reference_number": "KE-MOTI-566726-CS-QCBS"
+}
+```
 
-The "Date of Imposition of Sanction" column mixes actual dates and status
-words ("Ongoing") in one cell, and - confirmed live in the real page,
-2026-09-07 - contains at least one source-side typo ("**Feberuary**").
-`parseWorldBankSanctionDate` only recognizes correctly-spelled full month
-names and returns `null` for anything else rather than guessing at a
-misspelling; the raw text is always preserved verbatim in `status_or_estado`
-so nothing is lost.
+**Debarment record** (World Bank "Other Sanctions" sub-table):
 
-## ADB and IDB: live research findings (2026-09-07)
+```json
+{
+    "record_id": "wb-sanction-oao-armada-ongoing",
+    "event_type": "SANCTION",
+    "scraped_at": "2026-09-08T09:14:23.107Z",
+    "is_new": null,
+    "source_url": "https://www.worldbank.org/en/projects-operations/procurement/debarred-firms",
+    "recipient_or_defendant_name": "OAO Armada",
+    "entity_identifier_native": "OAO Armada *12",
+    "value_native": null,
+    "value_currency": null,
+    "value_usd_normalized": null,
+    "effective_date_iso": null,
+    "publish_date_iso": null,
+    "category_or_type": "Letter of reprimand",
+    "status_or_estado": "Ongoing",
+    "awarding_or_regulating_agency": "World Bank",
+    "jurisdiction": "WB",
+    "source_document_url": "https://www.worldbank.org/content/dam/documents/sanctions/sanctions-board/2025/sep/Sanctions%20Board%20Decision%20No.%2065%20-%20Letter%20of%20Reprimand.pdf",
+    "reference_number": "12"
+}
+```
 
-Both were freshly researched for this actor - WebSearch/WebFetch plus direct
-`curl` verification of robots.txt and response codes - and both are
-**deferred, not force-scraped**. Full detail and evidence URLs live in
-`src/sources/deferredSources.ts` (logged at the start of every actor run);
-summary:
+Notes on nulls, both honest rather than parsing gaps: the Procurement
+Notices API exposes no winner/bidder-name field and no monetary-value field
+at all, so `recipient_or_defendant_name`, `value_native`, `value_currency`,
+and `value_usd_normalized` are always `null` on procurement-notice records.
+The Other Sanctions sub-table's "Date of Imposition of Sanction" column
+mixes real dates with status words like `"Ongoing"` in the same cell; when
+it isn't a cleanly parseable date, `effective_date_iso` is `null` and the
+raw text is preserved verbatim in `status_or_estado` rather than guessed at.
+`jurisdiction` is the plain string `"WB"` for every record — this actor
+covers a supranational lender, not a national/subnational government.
 
-### ADB (Asian Development Bank) - deferred
+## Reliability
 
-`adb.org` sits behind a **Cloudflare bot-detection/WAF challenge** on every
-path tested:
+- **Content-anchored extraction, not brittle selectors.** The Other
+  Sanctions table is located by matching its header row against real header
+  text (`"Name of Firm & Address"`, `"Date of Imposition of Sanction"`,
+  `"Sanction Imposed"`, `"Grounds"`), not a CSS class the source page
+  doesn't define.
+- **Degrade-honestly on extraction failure.** If that header row can't be
+  found, or is found but zero data rows parse out of it, the actor treats
+  this as an extraction-integrity failure — never as "no sanctions
+  currently exist." It pushes one `SNAPSHOT_NO_DIFF` fallback record
+  pointing at the World Bank's own static "Notes on Debarred Firms and
+  Individuals" PDF instead of silently reporting an empty result.
+- **Real cross-run delta detection.** In delta mode, a dual content
+  fingerprint (one hash over `notice_status`, one over other mutable
+  fields) is persisted per procurement-notice ID in this actor's own
+  key-value store between runs, producing `NEW_LISTING`, `STATUS_CHANGE`,
+  `UPDATED`, or `SNAPSHOT_NO_DIFF` per notice. `is_new` is populated
+  (`true`/`false`) on every procurement-notice record regardless of whether
+  delta mode is on.
+- **Calibrated retry logic.** HTTP fetches distinguish retryable statuses
+  (429 / 5xx) from permanent client errors (other 4xx), apply exponential
+  backoff with jitter, and honor a real `Retry-After` header when the
+  server sends one, instead of retrying every non-OK response uniformly.
+- **Schema-validated inputs.** The Procurement Notices API's JSON envelope
+  is parsed against a Zod schema on every page fetch, so an unexpected
+  shape from the source fails loudly instead of silently propagating bad
+  data. Actor input is likewise validated against a Zod schema; if it's
+  invalid, the run logs a warning and falls back to documented defaults
+  rather than crashing.
+- **No bypass of access controls, anywhere.** No CAPTCHA-solving, no
+  fingerprint spoofing, no WAF/OAuth-gate bypass is implemented for any
+  source, live or deferred — which is precisely why ADB and IDB are
+  deferred rather than scraped through their respective gates.
 
-- `adb.org/business/project-procurement/business-opportunities` -> HTTP 403
-- `adb.org/business/how-to/where-to-find-current-tenders-bidding-opportunities` -> HTTP 403
-- `adb.org/rss` (the page listing ADB's procurement-notice RSS feeds) -> HTTP 403, even with a real browser `User-Agent`
-- `adb.org/robots.txt` itself returns a Cloudflare "Just a moment..." interstitial page (not a robots.txt at all), with a CSP referencing `challenges.cloudflare.com`
+## Pricing
 
-ADB does document RSS feeds for procurement/tender categories, but the feed
-host inherits the same Cloudflare gate - so this is not a genuinely open
-machine-readable export in practice. This is precisely the kind of gate this
-fleet's compliance doctrine forbids working around (no WAF bypass, no
-fingerprint spoofing), so ADB procurement notices are out of scope for v1.
+This actor uses Apify's Pay-Per-Event (PPE) pricing model, billed per
+normalized record delivered:
 
-### IDB / BID (Inter-American Development Bank) - deferred
+- `procurementNotices` event: **$0.001 per record** (Procurement Notices
+  sub-source).
+- `debarredFirms` event: **$0.003 per record** (Other Sanctions sub-source).
 
-IDB's live Procurement Notices page
-(`iadb.org/en/how-we-can-work-together/procurement/procurement-projects/procurement-notices`,
-HTTP 200) renders its listing **exclusively via an embedded Power BI
-report** - confirmed via the page's `drupalSettings.idb_powerbi.embedUrl`
-(`https://app.powerbi.com/reportEmbed?reportId=8a3cf387-...`). That's a
-JS-rendered, third-party embed, not static HTML or a documented open API.
+You pay only for the normalized records this actor actually delivers to
+your dataset on each run — there is no separate per-run or per-source flat
+fee on top of these two event rates.
 
-The one genuinely structured route to comparable IDB data is real: a CKAN
-open-data dataset at `data.iadb.org` ("IDB Project procurement bidding
-notices and notification of contract awards", CC-BY 4.0), whose
-`package_show`/`datastore_search` API endpoints return valid JSON when
-queried directly. However, `data.iadb.org/robots.txt` **explicitly
-disallows** `/api/`, `/datastore/dump/`, `/file/download/`, and
-`/dataset/download/`, under the comment _"Block direct download paths to
-force landing page traffic"_ - i.e. every machine-readable access path to
-that data is robots-disallowed by the publisher itself, even though the
-dataset's content license is open.
+## Support & Enterprise SLA
 
-Both routes are non-compliant for this actor's plain-fetch,
-robots-respecting design (reverse-engineering the Power BI embed would be a
-JS-embed/auth-token bypass; calling the CKAN API would ignore an explicit
-robots.txt disallow), so IDB procurement notices are deferred rather than
-force-scraped either way.
-
-If either bank's access posture changes, `src/sources/deferredSources.ts`
-documents exactly where to pick this up: add
-`src/sources/adbProcurement.ts` / `src/sources/idbProcurement.ts` next to
-`worldBankProcurementNotices.ts`, extend `umsNormalizer.ts`, and use the
-`'ADB'`/`'IDB'` jurisdiction codes already reserved there.
-
-## Unified Master Schema (UMS)
-
-All records - from both live sub-sources - are normalized through the one
-shared `src/umsNormalizer.ts` into an 18-field UMS
-(`src/schemas.ts#UnifiedRecordSchema`), null-honest per field.
-`jurisdiction` here is a plain non-empty string (`'WB'`), not a closed
-enum - a supranational lender doesn't fit a union of national/subnational
-government codes.
-
-Because this single actor emits two different native record shapes (unlike
-most of this developer's other actors, where one actor = one shape),
-`record_id` is prefixed per sub-source (`wb-procnotice-<id>`,
-`wb-sanction-<slug>`) so ids are self-describing and can't collide within a
-run.
-
-## Delta mode - change detection (Procurement Notices only)
-
-Enable `onlyNew: true` and this actor persists a content fingerprint per
-Procurement Notice (in its own named key-value store) and returns only
-notices that are new since the last run OR whose `notice_status` or other
-tracked fields changed since last seen:
-
-- **`NEW_LISTING`** - first time this notice id has been seen.
-- **`STATUS_CHANGE`** - `notice_status` differs from last time (e.g. a
-  notice moving toward award/close).
-- **`UPDATED`** - some other field changed (deadline, description, contact
-  info, etc.) but status didn't.
-- **`SNAPSHOT_NO_DIFF`** - identical to last time; skipped from delivery
-  when `onlyNew` is on.
-
-`is_new` (`true`/`false`) is always populated on every Procurement Notice
-record, regardless of `onlyNew`.
-
-There's no "closed" event here: this endpoint is genuinely
-server-side-paginated and each run's fetch stops once `maxItemsPerSource`
-is reached, so a fetch is never guaranteed to be a complete census of the
-register the way a single-file export would be - a trustworthy
-absence-means-closed signal isn't available. The **"Other Sanctions"**
-sub-source has no delta concept at all (`is_new: null`,
-`event_type: 'SANCTION'` always) - it's a small static snapshot page, not a
-paginated/dated feed.
-
-## Pricing (PPE)
-
-Compute baseline: $0.25/CU-hour at 1GB / 2,000 req-hr => $0.000125/request.
-
-- `procurementNotices` event: **$0.001/record** (~99.75% margin - a single
-  cheap JSON GET returns many records per request).
-- `debarredFirms` event: **$0.003/record** (~91.7-95.8% margin, normal vs.
-  degraded-fallback path - one HTML fetch amortized across a small,
-  slowly-changing row count).
-
-Both clear this fleet's 85% margin bar (`cost/record <= price * 0.15`) and
-sit within the existing $0.0005-$0.003/record rate card.
-
-## Compliance
-
-No CAPTCHA-solving, no fingerprint spoofing, no WAF/OAuth-gate bypass
-anywhere in this package (verified by grep - the only occurrences of those
-terms are in documentation/comments explaining what is deliberately _not_
-done and why ADB/IDB are deferred). Both live sources were robots.txt- and
-response-code-checked on 2026-09-07:
-
-- `search.worldbank.org`: no robots.txt (404 - no restrictions declared).
-- `www.worldbank.org`: robots.txt present (`Allow: /`), does not disallow
-  `/en/projects-operations/procurement/debarred-firms`.
-
-## Self-verification (run 2026-09-07)
-
-1. `npm install` - succeeded (437 packages, 0 errors).
-2. `npm run build` (`tsc`) - **zero type errors**.
-3. `npm test` (`vitest run`) - **29/29 tests passed**, 3 test files
-   (`test/umsNormalizer.test.ts`, `test/dateUtils.test.ts`,
-   `test/worldBankDebarredFirms.test.ts`), all against real fixture data
-   captured from live sources, no live network calls inside the test suite.
-4. A real, read-only, low-volume live fetch was made against the World Bank
-   Procurement Notices API during development (`rows=3`, free/unauthenticated
-   GET) confirming the documented envelope shape still matches. The full
-   actor was then also run end-to-end locally (`tsx src/main.ts` against real
-   local Apify storage, `maxItemsPerSource: 5`) and successfully pushed 5 real
-   procurement-notice records and 4 real Other-Sanctions records with the
-   exact documented UMS shape - not just unit-tested in isolation.
-5. `grep`-ed for CAPTCHA/fingerprint/WAF-bypass language across `src/`,
-   `mcp/`, and `test/` - all matches are documentary (compliance-doctrine
-   references and the ADB/IDB deferral writeup), zero implementation.
-6. Known incomplete item: ADB and IDB procurement notices are not ingested
-   in this v1, by design - see the research findings above.
-
-One environment note from step 4: in this development sandbox, one of the
-"Other Sanctions" PDF links resolved through a corporate network security
-proxy (`mcas-proxyweb.mcas.ms`) rather than a bare `worldbank.org` URL. That
-is an artifact of the outbound network the fetch happened to run through in
-this session, not something this code does - the parser stores whatever
-`href` is present in the page verbatim, so on Apify's platform (or any
-unproxied network) it would capture the real `worldbank.org`/`thedocs.worldbank.org`
-URL as-is.
+This is an independently developed and maintained actor, not a
+vendor-backed enterprise product. Bugs, data-quality issues, or feature
+requests are best filed through this actor's issue tracker on the Apify
+Store page; the developer typically responds within about 48 hours. There
+is no contractual enterprise SLA or guaranteed uptime commitment attached
+to this actor — if your use case requires one, please reach out before
+relying on it for a mission-critical workflow so expectations are clear
+up front.
