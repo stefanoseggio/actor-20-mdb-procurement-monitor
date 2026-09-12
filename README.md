@@ -1,5 +1,12 @@
 # World Bank Procurement Intelligence - Tenders & Debarment Monitor (Global Development Finance)
 
+[![Built for Apify](https://img.shields.io/badge/Built%20for-Apify-00C2FF?style=flat-square&logo=apify&logoColor=white)](https://apify.com)
+[![Pay-Per-Event pricing](https://img.shields.io/badge/Pay--Per--Event-from%20%240.001%2Fevent-3DDC84?style=flat-square)](#pricing-pay-per-event)
+[![TypeScript](https://img.shields.io/badge/TypeScript-blue?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](./LICENSE)
+
+[![Run this Actor on Apify](https://img.shields.io/badge/%E2%96%B6%20Run%20on-Apify-FF9012?style=for-the-badge)](https://apify.com/stefano_seggio/actor-20-mdb-procurement-monitor)
+
 ## Executive Value Proposition
 
 Checking the World Bank's procurement portal and its debarred-firms page by
@@ -64,6 +71,29 @@ Example input (matches `.actor/input_schema.json`):
 | `countryFilter`     | array of strings | none                                                               | Client-side filter on `project_ctry_name` (procurement notices only). The World Bank API documents no server-side country filter, so this is applied after each page is fetched.                  |
 | `noticeTypeFilter`  | array of strings | none                                                               | Client-side filter on `notice_type` (procurement notices only), e.g. `Invitation for Bids`, `Request for Expression of Interest`, `Contract Award`.                                                |
 | `dateRange`         | enum             | none                                                               | Restrict procurement notices to `24h` / `7d` / `30d` based on `noticedate`. Not applied to Other Sanctions records (no reliable per-record publish date in that sub-table).                        |
+
+## Quick start
+
+Run it straight from the [Apify CLI](https://docs.apify.com/cli/) (requires `npm install -g apify-cli` and `apify login` once):
+
+```bash
+apify call actor-20-mdb-procurement-monitor --input '{
+    "sources": ["worldBankProcurementNotices", "worldBankDebarredFirms"],
+    "maxItemsPerSource": 50,
+    "onlyNew": false,
+    "countryFilter": ["Kenya", "India"],
+    "noticeTypeFilter": ["Invitation for Bids"],
+    "dateRange": "30d"
+}'
+```
+
+The run's normalized records land in its default dataset. Fetch them straight from the terminal:
+
+```bash
+apify datasets get-items <dataset-id> --clean
+```
+
+or pull the same data programmatically — see the Node.js and Python snippets in `examples/` for a scripted equivalent using `apify-client`.
 
 ## Output
 
@@ -166,18 +196,21 @@ covers a supranational lender, not a national/subnational government.
   source, live or deferred — which is precisely why ADB and IDB are
   deferred rather than scraped through their respective gates.
 
-## Pricing
+## Pricing (Pay-Per-Event)
 
 This actor uses Apify's Pay-Per-Event (PPE) pricing model, billed per
-normalized record delivered:
+normalized record delivered — not per run, and not per platform compute
+unit:
 
-- `procurementNotices` event: **$0.001 per record** (Procurement Notices
-  sub-source).
-- `debarredFirms` event: **$0.003 per record** (Other Sanctions sub-source).
+| Event | Title | Price | Fires on |
+| --- | --- | --- | --- |
+| `procurementNotices` | World Bank Procurement Notice | **$0.001 / event** | Each normalized record from the Procurement Notices sub-source |
+| `debarredFirms` | World Bank Debarment/Sanction Record | **$0.003 / event** | Each normalized record from the Other Sanctions sub-source |
 
 You pay only for the normalized records this actor actually delivers to
 your dataset on each run — there is no separate per-run or per-source flat
-fee on top of these two event rates.
+fee on top of these two event rates, and no charge for a run that finds
+nothing new when `onlyNew` is enabled.
 
 ## Support & Enterprise SLA
 
@@ -189,3 +222,7 @@ is no contractual enterprise SLA or guaranteed uptime commitment attached
 to this actor — if your use case requires one, please reach out before
 relying on it for a mission-critical workflow so expectations are clear
 up front.
+
+---
+
+This Actor is part of **Delta Registry** — pay-per-event regulatory & compliance data infrastructure built and operated by Stefano Seggio. For professional inquiries or enterprise licensing, connect on [LinkedIn](https://www.linkedin.com/in/stefanoseggio-deltaregistry); for the rest of the fleet, see [github.com/stefanoseggio](https://github.com/stefanoseggio).
