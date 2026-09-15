@@ -196,6 +196,39 @@ covers a supranational lender, not a national/subnational government.
   source, live or deferred — which is precisely why ADB and IDB are
   deferred rather than scraped through their respective gates.
 
+## Instant Terminal Run (cURL)
+
+Runs synchronously and returns the resulting dataset items directly in the response - no polling needed. Get your token from [console.apify.com/settings/integrations](https://console.apify.com/settings/integrations).
+
+```bash
+curl -X POST "https://api.apify.com/v2/acts/dyzTtWjfyYd7bvUZY/run-sync-get-dataset-items?token=<YOUR_API_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "maxItemsPerSource": 50,
+  "onlyNew": true
+}'
+```
+
+## Sample Extracted Dataset (JSON)
+
+One real record from this Actor's own dataset, matching `.actor/dataset_schema.json`:
+
+```json
+{
+  "record_id": "wb-procnotice-OP00467118",
+  "event_type": "NEW_LISTING",
+  "scraped_at": "2026-09-08T09:14:22.481Z",
+  "is_new": true,
+  "source_url": "https://search.worldbank.org/api/v2/procnotices?format=json&id=OP00467118",
+  "entity_identifier_native": "KE-MOTI-566726-CS-QCBS",
+  "effective_date_iso": "2026-10-06T00:00:00Z",
+  "category_or_type": "Request for Expression of Interest",
+  "status_or_estado": "Published",
+  "awarding_or_regulating_agency": "Ministry of Transport and Infrastructure",
+  "jurisdiction": "WB"
+}
+```
+
 ## Pricing (Pay-Per-Event)
 
 This actor uses Apify's Pay-Per-Event (PPE) pricing model, billed per
