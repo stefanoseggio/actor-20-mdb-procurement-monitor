@@ -170,6 +170,61 @@ apify call actor-20-mdb-procurement-monitor --input '{
 
 The run's normalized records land in its default dataset. Fetch them straight from the terminal with `apify datasets get-items <dataset-id> --clean`.
 
+## Use this from Claude Desktop, Cursor, or Windsurf (via MCP)
+
+This Actor is also reachable through Apify's own hosted `@apify/actors-mcp-server` at `https://mcp.apify.com`, scoped to just this one Actor via a `?tools=stefano_seggio/actor-20-mdb-procurement-monitor` query string - your MCP client gets tool access to this Actor alone, not the rest of the fleet. Get your own token from [Apify Console → Settings → Integrations](https://console.apify.com/settings/integrations) first.
+
+**Claude Desktop** (`claude_desktop_config.json`) - uses the `mcp-remote` stdio bridge, not a direct URL. Note: `mcp-remote` does not expand shell environment variables inside this JSON string, so paste your real token literally in place of `${APIFY_TOKEN}` below, and keep this file out of version control:
+
+```json
+{
+  "mcpServers": {
+    "delta-registry-actor-20-mdb-procurement-monitor": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.apify.com/?tools=stefano_seggio/actor-20-mdb-procurement-monitor",
+        "--header",
+        "Authorization: Bearer ${APIFY_TOKEN}"
+      ]
+    }
+  }
+}
+```
+
+**Cursor** (`.cursor/mcp.json` or `~/.cursor/mcp.json`) - native HTTP transport:
+
+```json
+{
+  "mcpServers": {
+    "delta-registry-actor-20-mdb-procurement-monitor": {
+      "url": "https://mcp.apify.com/?tools=stefano_seggio/actor-20-mdb-procurement-monitor",
+      "headers": {
+        "Authorization": "Bearer ${APIFY_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+**Windsurf** (`~/.codeium/windsurf/mcp_config.json`) - uses `serverUrl`, not `url`. Unlike Claude Desktop's `mcp-remote` bridge, Windsurf's `${env:...}` syntax genuinely resolves from your environment at runtime:
+
+```json
+{
+  "mcpServers": {
+    "delta-registry-actor-20-mdb-procurement-monitor": {
+      "serverUrl": "https://mcp.apify.com/?tools=stefano_seggio/actor-20-mdb-procurement-monitor",
+      "headers": {
+        "Authorization": "Bearer ${env:APIFY_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+Want every actor in the fleet available to one MCP client instead of just this one? See [`delta-registry-website/MCP_INTEGRATION.md`](https://github.com/stefanoseggio/delta-registry-website/blob/main/MCP_INTEGRATION.md) for the full 28-actor closed-scope config.
+
 ## Input & Output Schema
 
 ### Input
