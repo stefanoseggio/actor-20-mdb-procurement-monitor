@@ -1,0 +1,61 @@
+name: Feature Request
+description: Propose a new input field, output field, or data-source addition
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Proposing a new source (e.g. ADB or IDB)? Read this Actor's compliance doctrine first
+        (README → Reliability → "No bypass of access controls, anywhere"): no CAPTCHA-solving,
+        no fingerprint spoofing, no WAF/OAuth-gate bypass. ADB and IDB are currently deferred
+        for exactly this reason - a source that requires bypassing either gate will be declined
+        regardless of how valuable the data would be.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the real use case this would unblock, not just the feature itself.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What input field, output field, or behavior would you like to see added?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - New input filter
+        - New output field
+        - New data-source cross-reference
+        - Delta-engine / classification logic change
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Can this already be achieved with existing inputs (e.g. countryFilter, noticeTypeFilter, dateRange)? If so, why isn't that sufficient?
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I confirmed this isn't already possible with an existing input field (see README → Input & Output Schema)
+          required: true
+        - label: If this proposes a new data source, I confirmed it's openly accessible (no login wall, no CAPTCHA, no registration gate)
+          required: false

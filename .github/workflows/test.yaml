@@ -18,3 +18,21 @@ jobs:
             - run: npm run lint
             - run: npm run build
             - run: npm test
+            - name: Verify reproducible build (byte-identity check)
+              run: |
+                  # tsc's incremental cache (tsconfig.tsbuildinfo) makes a second `tsc`
+                  # invocation skip re-emitting files it thinks are already up to date,
+                  # even after dist/ is deleted - that would make this check a no-op
+                  # false-pass. Both dist/ and the buildinfo cache must be cleared before
+                  # each build for this comparison to test anything real.
+                  rm -rf dist tsconfig.tsbuildinfo
+                  npm run build
+                  sha256sum $(find dist -type f | sort) > /tmp/build-hash-1.txt
+                  rm -rf dist tsconfig.tsbuildinfo
+                  npm run build
+                  sha256sum $(find dist -type f | sort) > /tmp/build-hash-2.txt
+                  if ! diff -u /tmp/build-hash-1.txt /tmp/build-hash-2.txt; then
+                      echo "::error::Build is not reproducible - two consecutive builds from the same source produced different output."
+                      exit 1
+                  fi
+                  echo "Build is byte-identical across two consecutive runs."

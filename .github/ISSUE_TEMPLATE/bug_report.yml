@@ -1,0 +1,78 @@
+name: Bug Report
+description: Report a defect in the Actor's extraction, delta-classification, or output behavior
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Before filing, please confirm this is a code
+        defect and not a data-source question — World Bank feed content questions belong on the
+        [Apify Store Issues tab](https://apify.com/stefano_seggio/actor-20-mdb-procurement-monitor)
+        instead of this repository.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear, specific description of the incorrect behavior.
+      placeholder: e.g. "A notice present in both runs was reported as NEW_LISTING instead of SNAPSHOT_NO_DIFF"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: run-input
+    attributes:
+      label: Actor input used
+      description: Paste the exact JSON input you ran the Actor with.
+      render: json
+    validations:
+      required: true
+
+  - type: input
+    id: run-id
+    attributes:
+      label: Apify Run ID (if applicable)
+      description: The run ID from the Apify Console, if you triggered this via the Apify platform. Never paste your API token here.
+      placeholder: e.g. VHQ3K1gJMYTnjPkEK
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Paste the relevant portion of the Actor run log. Redact anything sensitive first.
+      render: shell
+    validations:
+      required: false
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Data correctness (wrong classification/output)
+        - Crash / run failure
+        - Performance / timeout
+        - Documentation mismatch
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I checked the README's Reliability section and this isn't already a documented, disclosed limitation
+          required: true
+        - label: I did not include my Apify API token, or any other secret, anywhere in this report
+          required: true

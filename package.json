@@ -37,5 +37,5 @@
         "test": "vitest run"
     },
     "author": "Stefano",
-    "license": "ISC"
+    "license": "Apache-2.0"
 }

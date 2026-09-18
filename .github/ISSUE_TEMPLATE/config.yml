@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Data / pricing / non-code question
+    url: https://apify.com/stefano_seggio/actor-20-mdb-procurement-monitor
+    about: Questions about the source data, pricing, or Apify Store listing itself belong on the Store's Issues tab, not this repository.
+  - name: Report a security vulnerability
+    url: https://github.com/stefanoseggio/actor-20-mdb-procurement-monitor/security/advisories/new
+    about: Use private vulnerability reporting for anything security-sensitive - see SECURITY.md.
