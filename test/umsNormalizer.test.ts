@@ -114,12 +114,32 @@ describe('normalizeWorldBankOtherSanction', () => {
         expect(record.effective_date_iso).toBeNull();
     });
 
+    it("cleans the display name and recovers the footnote reference number for a firm whose address cell spans multiple <p> siblings after the name (regression: address text used to run onto the footnote marker and defeat the strip)", () => {
+        const tpf = sanctions.find((s) => s.firmNameRaw.includes('TPF GETINSA'));
+        expect(tpf).toBeDefined();
+        const record = normalizeWorldBankOtherSanction(tpf!, SCRAPED_AT);
+
+        expect(record.recipient_or_defendant_name).toBe('TPF GETINSA EUROESTUDIOS S.L.');
+        expect(record.recipient_or_defendant_name).not.toMatch(/Aguinaga|Madrid|Spain/);
+        expect(record.reference_number).toBe('59');
+    });
+
     it('parses a cleanly-formatted imposition date into effective_date_iso', () => {
         const iqvia = sanctions.find((s) => s.firmNameRaw.includes('IQVIA'));
         expect(iqvia).toBeDefined();
         const record = normalizeWorldBankOtherSanction(iqvia!, SCRAPED_AT);
 
         expect(record.effective_date_iso).toBe('2025-06-17T00:00:00.000Z');
+    });
+
+    it("cleans the display name and recovers the footnote reference number for a firm whose multi-line address cell has no separating whitespace before the marker (regression: same corruption as TPF above, second of the 2 currently-corrupted live rows)", () => {
+        const iqvia = sanctions.find((s) => s.firmNameRaw.includes('IQVIA'));
+        expect(iqvia).toBeDefined();
+        const record = normalizeWorldBankOtherSanction(iqvia!, SCRAPED_AT);
+
+        expect(record.recipient_or_defendant_name).toBe('IQVIA Consulting and Information Services India');
+        expect(record.recipient_or_defendant_name).not.toMatch(/Lodha|Mumbai|Maharashtra/);
+        expect(record.reference_number).toBe('69');
     });
 
     it('honestly nulls value fields and is_new - this sub-table has no monetary or delta-tracking concept', () => {

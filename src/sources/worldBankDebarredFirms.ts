@@ -47,6 +47,28 @@ export interface DebarredFirmsExtractionResult {
     degradedReason: string | null;
 }
 
+// The "Name of Firm & Address" cell sometimes holds more than just the firm
+// name: a first <p> with the name (+ a trailing "*<digits>" footnote marker),
+// followed by one or more further <p> siblings carrying the firm's address
+// (confirmed live 2026-09-19, e.g. "TPF GETINSA EUROESTUDIOS S.L. *59" then
+// separate <p>s for street/city/country). A plain `.text()` over the whole
+// cell concatenates all of that - address included - onto the name, and in
+// the live (minified) markup those <p>s can be adjacent with no whitespace
+// between them at all, so the address runs directly onto the footnote marker
+// with nothing to delimit it. That silently breaks the downstream
+// "*<digits>" footnote-stripping regex in umsNormalizer.ts, which only
+// matches when the marker sits at the very end of the string: once address
+// text follows it, the regex no longer matches, so the cleaned display name
+// ships with garbled address text appended and the reference number is lost
+// (silently null). The firm name and its footnote only ever live in the
+// cell's first <p> - address lines are always later siblings - so anchoring
+// extraction to that first <p> sidesteps the concatenation entirely.
+function extractFirmNameCellText(cell: cheerio.Cheerio<AnyNode>): string {
+    const firstParagraph = cell.find('p').first();
+    const source = firstParagraph.length > 0 ? firstParagraph : cell;
+    return source.text().replace(/\s+/g, ' ').trim();
+}
+
 function findOtherSanctionsTable($: cheerio.CheerioAPI): cheerio.Cheerio<AnyNode> | null {
     const tables = $('table').toArray();
     for (const table of tables) {
@@ -82,7 +104,7 @@ export function parseOtherSanctionsHtml(html: string): DebarredFirmsExtractionRe
         const cells = $(row).find('td').toArray();
         if (cells.length < 4) continue;
 
-        const firmNameRaw = $(cells[0]).text().replace(/\s+/g, ' ').trim();
+        const firmNameRaw = extractFirmNameCellText($(cells[0]));
         if (!firmNameRaw) continue;
 
         const dateOfImpositionRaw = $(cells[1]).text().replace(/\s+/g, ' ').trim();

@@ -55,5 +55,23 @@ export async function fetchWorldBankProcurementNotices(
         os += batch.length;
     }
 
-    return results;
+    // The upstream feed is sorted newest-first and continuously grows
+    // (confirmed live 2026-09-19: total=419,493 and climbing) while this
+    // function pages it by a plain numeric offset. If a new notice is
+    // inserted at the front between two of our sequential page fetches, it
+    // shifts every later page's boundary by one, so a notice already
+    // collected on an earlier page can reappear at the top of a later page
+    // and get pushed into `results` a second time - risking a
+    // double-push-and-double-charge downstream. De-duplicate by notice id
+    // before returning, keeping the first (i.e. earliest-fetched) occurrence
+    // of each id.
+    const seenIds = new Set<string>();
+    const deduped: WorldBankProcNoticeRaw[] = [];
+    for (const notice of results) {
+        if (seenIds.has(notice.id)) continue;
+        seenIds.add(notice.id);
+        deduped.push(notice);
+    }
+
+    return deduped;
 }
