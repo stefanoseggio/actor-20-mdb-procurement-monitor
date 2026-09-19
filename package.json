@@ -1,6 +1,6 @@
 {
     "name": "actor-20-mdb-procurement-monitor",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "type": "module",
     "description": "Multilateral Development Bank Procurement Monitor: extracts the World Bank's public Procurement Notices API and the World Bank's static 'Other Sanctions' debarment sub-table, normalized to the fleet's 18-field Unified Master Schema. ADB and IDB procurement feeds were live-researched and are deliberately deferred - see README.md for the compliance findings.",
     "engines": {
