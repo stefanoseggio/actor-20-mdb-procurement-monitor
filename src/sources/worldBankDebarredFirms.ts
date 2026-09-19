@@ -1,5 +1,5 @@
-import type { AnyNode } from 'cheerio';
 import * as cheerio from 'cheerio';
+import type { AnyNode } from 'domhandler';
 
 import { fetchTextWithRetry } from '../http.js';
 import type { WorldBankOtherSanctionRaw } from '../schemas.js';
