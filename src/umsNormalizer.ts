@@ -83,10 +83,14 @@ export function normalizeWorldBankProcurementNotice(
 // -----------------------------------------------------------------------
 
 export function normalizeWorldBankOtherSanction(raw: WorldBankOtherSanctionRaw, scrapedAt: string): UnifiedRecord {
-    // The firm-name cell sometimes carries a footnote marker (e.g. "OAO
-    // Armada *12") and/or an embedded address on following lines - keep the
-    // full raw text as entity_identifier_native (native, unnormalized) and
-    // derive a cleaned display name by stripping a trailing "*<digits>" marker.
+    // The firm-name cell sometimes carries a trailing footnote marker (e.g.
+    // "OAO Armada *12"). firmNameRaw is already scoped to just the cell's
+    // first <p> by worldBankDebarredFirms.ts (deliberately excluding any
+    // address lines that follow in later <p> siblings, which would otherwise
+    // run onto the marker and break the strip below - see that file's
+    // extractFirmNameCellText comment) - keep it as entity_identifier_native
+    // (native, unnormalized) and derive a cleaned display name by stripping
+    // a trailing "*<digits>" marker.
     const cleanedName = raw.firmNameRaw.replace(/\*\d+\s*$/, '').trim() || raw.firmNameRaw;
     const referenceMatch = raw.firmNameRaw.match(/\*(\d+)\s*$/);
 
