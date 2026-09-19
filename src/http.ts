@@ -1,5 +1,7 @@
-// Plain fetch()-with-exponential-backoff-retry, NO proxy - matching this
-// fleet's standing convention (see e.g. uk-hse-enforcement-monitor/src/http.ts).
+import { Impit, type ImpitResponse } from 'impit';
+
+// impit-based fetch()-with-exponential-backoff-retry, NO proxy - matching
+// this fleet's standing convention (see e.g. uk-hse-enforcement-monitor/src/http.ts).
 //
 // Verified live 2026-09-07, both hosts this actor calls:
 //  - search.worldbank.org: no robots.txt (404 - no restrictions declared),
@@ -21,6 +23,12 @@
 //    paths to force landing page traffic") - i.e. every programmatic access
 //    path to the data is robots-disallowed by the publisher's own policy.
 //  See src/sources/deferredSources.ts and README.md for the full writeup.
+
+// One Impit instance per actor run: it holds the connection pool and TLS
+// session cache, and gives every request a real, internally-consistent
+// Chrome TLS/HTTP2 fingerprint instead of Node's native (and distinctively
+// bot-shaped) one - see AGENTS.md for why this was added.
+const impit = new Impit({ browser: 'chrome' });
 
 async function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => {
@@ -66,11 +74,11 @@ function isRetryableStatus(status: number): boolean {
     return status === 429 || status >= 500;
 }
 
-async function fetchWithRetry(url: string, maxRetries = 4, baseDelayMs = 1000): Promise<Response> {
+async function fetchWithRetry(url: string, maxRetries = 4, baseDelayMs = 1000): Promise<ImpitResponse> {
     let lastError: Error = new Error('unreachable');
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-            const response = await fetch(url, { redirect: 'follow' });
+            const response = await impit.fetch(url, { redirect: 'follow' });
             if (!response.ok) {
                 const retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'));
                 throw new HttpError(`HTTP ${response.status} for ${url}`, response.status, retryAfterMs);

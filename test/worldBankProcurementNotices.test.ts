@@ -1,5 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+// impit's Impit.fetch() is a native binding, not built on the global `fetch` -
+// vi.spyOn(globalThis, 'fetch') never intercepts it. Mock the `impit` module
+// itself instead, so `new Impit()` in src/http.ts returns an object whose
+// `.fetch` is this mock. vi.hoisted() is required because vi.mock() factories
+// run before the top-level `const` below would otherwise be initialized.
+const { fetchMock } = vi.hoisted(() => ({
+    fetchMock: vi.fn<(url: string, init: RequestInit) => Promise<Response>>(),
+}));
+vi.mock('impit', () => ({
+    // Must be a real `function`, not an arrow function - `new Impit(...)` in
+    // src/http.ts requires a constructible mock implementation.
+    Impit: vi.fn().mockImplementation(function ImpitMock() {
+        return { fetch: fetchMock };
+    }),
+}));
+
 import { fetchWorldBankProcurementNotices } from '../src/sources/worldBankProcurementNotices.js';
 
 function envelopeResponse(total: number, ids: string[]): Response {
@@ -14,7 +30,7 @@ function envelopeResponse(total: number, ids: string[]): Response {
 }
 
 afterEach(() => {
-    vi.restoreAllMocks();
+    fetchMock.mockReset();
 });
 
 describe('fetchWorldBankProcurementNotices - per-run de-duplication', () => {
@@ -24,7 +40,7 @@ describe('fetchWorldBankProcurementNotices - per-run de-duplication', () => {
         // sequential page fetches (os=0 -> os=2 -> os=4), so a notice
         // inserted at the front shifts every later page's boundary by one
         // and an already-collected notice ("n4") reappears on the next page.
-        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+        fetchMock.mockImplementation(async (input) => {
             const url = new URL(String(input));
             const os = Number(url.searchParams.get('os'));
             if (os === 0) return envelopeResponse(5, ['n5', 'n4']);
@@ -43,7 +59,7 @@ describe('fetchWorldBankProcurementNotices - per-run de-duplication', () => {
     });
 
     it('returns notices unchanged when no duplicates occur across pages', async () => {
-        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+        fetchMock.mockImplementation(async (input) => {
             const url = new URL(String(input));
             const os = Number(url.searchParams.get('os'));
             if (os === 0) return envelopeResponse(4, ['a', 'b']);

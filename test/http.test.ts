@@ -6,6 +6,22 @@ function jsonResponse(status: number, body: string, headers: Record<string, stri
     return new Response(body, { status, headers });
 }
 
+// impit's Impit.fetch() is a native binding, not built on the global `fetch` -
+// vi.spyOn(globalThis, 'fetch') never intercepts it. Mock the `impit` module
+// itself instead, so `new Impit()` in src/http.ts returns an object whose
+// `.fetch` is this mock. vi.hoisted() is required because vi.mock() factories
+// run before the top-level `const` below would otherwise be initialized.
+const { fetchMock } = vi.hoisted(() => ({
+    fetchMock: vi.fn<(url: string, init: RequestInit) => Promise<Response>>(),
+}));
+vi.mock('impit', () => ({
+    // Must be a real `function`, not an arrow function - `new Impit(...)` in
+    // src/http.ts requires a constructible mock implementation.
+    Impit: vi.fn().mockImplementation(function ImpitMock() {
+        return { fetch: fetchMock };
+    }),
+}));
+
 describe('fetchTextWithRetry - calibrated 429/503 retry', () => {
     beforeEach(() => {
         vi.useFakeTimers();
@@ -14,11 +30,11 @@ describe('fetchTextWithRetry - calibrated 429/503 retry', () => {
     afterEach(() => {
         vi.useRealTimers();
         vi.restoreAllMocks();
+        fetchMock.mockReset();
     });
 
     it('retries on HTTP 429', async () => {
-        const fetchMock = vi
-            .spyOn(globalThis, 'fetch')
+        fetchMock
             .mockResolvedValueOnce(jsonResponse(429, 'Too Many Requests'))
             .mockResolvedValueOnce(jsonResponse(200, 'ok'));
 
@@ -32,7 +48,7 @@ describe('fetchTextWithRetry - calibrated 429/503 retry', () => {
 
     it('honors a numeric Retry-After header on 429', async () => {
         const sleepSpy = vi.spyOn(globalThis, 'setTimeout');
-        vi.spyOn(globalThis, 'fetch')
+        fetchMock
             .mockResolvedValueOnce(jsonResponse(429, 'slow down', { 'retry-after': '5' }))
             .mockResolvedValueOnce(jsonResponse(200, 'ok'));
 
@@ -45,8 +61,7 @@ describe('fetchTextWithRetry - calibrated 429/503 retry', () => {
     });
 
     it('retries on HTTP 503', async () => {
-        const fetchMock = vi
-            .spyOn(globalThis, 'fetch')
+        fetchMock
             .mockResolvedValueOnce(jsonResponse(503, 'Service Unavailable'))
             .mockResolvedValueOnce(jsonResponse(200, 'ok'));
 
@@ -59,7 +74,7 @@ describe('fetchTextWithRetry - calibrated 429/503 retry', () => {
     });
 
     it('does NOT retry a genuine 4xx client error like 404', async () => {
-        const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse(404, 'Not Found'));
+        fetchMock.mockResolvedValueOnce(jsonResponse(404, 'Not Found'));
 
         await expect(fetchTextWithRetry('https://search.worldbank.org/api/v2/procnotices', 4, 10)).rejects.toThrow(HttpError);
         expect(fetchMock).toHaveBeenCalledTimes(1);

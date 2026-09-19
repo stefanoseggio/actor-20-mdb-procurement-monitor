@@ -2,6 +2,39 @@
 
 Multilateral Development Bank Procurement Monitor. Two World Bank sub-sources normalized to one 18-field UMS: **Procurement Notices** (`search.worldbank.org/api/v2/procnotices`, real server-side paginated JSON, unauthenticated) and **"Other Sanctions"** debarred-firms table (`worldbank.org/.../debarred-firms`, static HTML, Table 2). ADB (Cloudflare-gated, confirmed live) and IDB (CKAN API real but `robots.txt`-blocked on every programmatic path) were live-researched and honestly deferred - see `src/sources/deferredSources.ts` and README.md, not silently omitted.
 
+## HTTP transport: `impit`, not the native `fetch`
+
+`src/http.ts`'s `fetchWithRetry` calls a module-level `Impit` instance
+(`new Impit({ browser: 'chrome' })`, from the `impit` package) instead of
+the global `fetch` - added 2026-09-19 as a fleet-wide TLS-fingerprint-
+hardening pilot (proactive hardening, not a bug fix - Node's `fetch` isn't
+deprecated). Two things to know if you touch this file again:
+- **`fetchWithRetry`'s return type is `ImpitResponse` (from `impit`), not
+  the DOM's `Response`.** `ImpitResponse` is API-compatible for the fields
+  this module reads (`status`, `ok`, `headers`, `text()`, `json()`) but is
+  missing others the DOM type declares (`type`, `redirected`, `bodyUsed`,
+  `formData()`), so it is not structurally assignable to `Response` -
+  `tsc` will fail if the annotation is reverted.
+- **`Impit.fetch()` is a native binding, not built on the global `fetch`.**
+  `vi.spyOn(globalThis, 'fetch')` will NOT intercept it - it does nothing
+  and the real network call goes out. Both `test/http.test.ts` and
+  `test/worldBankProcurementNotices.test.ts` mocked the global `fetch` this
+  way and were silently broken by the swap (found and fixed the same day
+  this was added) - they now mock the `impit` module itself
+  (`vi.mock('impit', ...)`, with `vi.hoisted()` for the mock function
+  reference, and a real `function` - not an arrow function - as the mock's
+  `Impit` implementation, since `new Impit(...)` requires a constructible
+  mock). Keep that pattern if either file's tests are extended.
+
+This repo has no `test:live` / `LIVE`-gated test suite (unlike
+`florida-tenders-monitor` and `australia-grantconnect-monitor`), so the
+post-migration connectivity check against the real World Bank hosts
+(`search.worldbank.org/api/v2/procnotices` and
+`www.worldbank.org/.../debarred-firms`) was done with an ad-hoc script
+calling `fetchJsonWithRetry`/`fetchTextWithRetry` directly, not committed
+to the repo. Both hosts returned real data through the new Chrome
+TLS/HTTP2 fingerprint.
+
 ## V2 delta engine (added 2026-09-08)
 
 This actor was one of 5 found on the account outside the original 9-actor V2 migration mandate. It already had a correctly-NAMED key-value store (no run-scoped `Actor.getValue()`/`setValue()` bug, unlike a sibling actor found the same day) but only flat seen-id tracking on the Procurement Notices sub-source, with `event_type` hardcoded to `'NEW_LISTING'` always.
