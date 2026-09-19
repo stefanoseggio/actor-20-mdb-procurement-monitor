@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.1.0](https://github.com/stefanoseggio/actor-20-mdb-procurement-monitor/compare/actor-20-mdb-procurement-monitor-v2.0.0...actor-20-mdb-procurement-monitor-v2.1.0) (2026-09-19)
+
+
+### Features
+
+* standardize on multi-stage Dockerfile builder pattern ([#10](https://github.com/stefanoseggio/actor-20-mdb-procurement-monitor/issues/10)) ([5d64616](https://github.com/stefanoseggio/actor-20-mdb-procurement-monitor/commit/5d6461629866ce1435d5e8f45636030edcf0aa6b))
+* V2 delta engine for Procurement Notices + hardened HTTP retry (2.0.0) ([8fbf1b4](https://github.com/stefanoseggio/actor-20-mdb-procurement-monitor/commit/8fbf1b4856a360f360b01687394c42af6a17edc2))
+
+
+### Bug Fixes
+
+* bump transitive adm-zip to 0.6.1, resolving a HIGH-severity CVE ([#12](https://github.com/stefanoseggio/actor-20-mdb-procurement-monitor/issues/12)) ([70b0e31](https://github.com/stefanoseggio/actor-20-mdb-procurement-monitor/commit/70b0e311c4df24673d50bc99ef818837420057c0))
+* **ci:** pass RELEASE_PLEASE_TOKEN so release PRs skip the bot-approval gate ([802c31b](https://github.com/stefanoseggio/actor-20-mdb-procurement-monitor/commit/802c31b0cf04e12c58db9b5fd5c81502860cd36d))
+* correct WB sanctions firm-name parsing and dedupe procnotices pages ([#11](https://github.com/stefanoseggio/actor-20-mdb-procurement-monitor/issues/11)) ([1b1beea](https://github.com/stefanoseggio/actor-20-mdb-procurement-monitor/commit/1b1beea07023ee0574d3dd860b55f9b0645cdf48))
+* **package:** remove stale v1 version reference from description ([7da5cac](https://github.com/stefanoseggio/actor-20-mdb-procurement-monitor/commit/7da5cac9b84981c8b7e3976b0c8e1490e2380915))
+* restore dist/ tracking (regression from repo-standardization pass) ([#9](https://github.com/stefanoseggio/actor-20-mdb-procurement-monitor/issues/9)) ([7486e62](https://github.com/stefanoseggio/actor-20-mdb-procurement-monitor/commit/7486e6272feda79e2fe3cf348e20b69c89fac3bd))
+
 ## 2.0.0 - 2026-09-08
 
 ### Added
