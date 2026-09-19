@@ -6,5 +6,5 @@ node_modules
 apify_storage
 storage
 .venv
-dist
 tsconfig.tsbuildinfo
+dist

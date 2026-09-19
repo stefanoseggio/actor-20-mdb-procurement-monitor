@@ -36,3 +36,23 @@ jobs:
                       exit 1
                   fi
                   echo "Build is byte-identical across two consecutive runs."
+
+    live-smoke-test:
+        # Runs this repo's own live-tagged tests (normally skipIf(process.env.CI)-skipped)
+        # as an informational PR signal. continue-on-error so a real external site hiccup
+        # during CI never blocks a merge - the exact lesson already documented in this
+        # fleet's own test files (pba-tenders-monitor, diario-oficial-cl-monitor). This is
+        # the only automated check in this repo that can catch a live site behavior change
+        # before merge; build-and-test above cannot, by design, since it skips live tests.
+        if: github.event_name == 'pull_request'
+        runs-on: ubuntu-latest
+        continue-on-error: true
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 24
+                  cache: npm
+            - run: npm ci
+            - name: Run live-tagged tests (CI unset so skipIf(process.env.CI) does not skip them)
+              run: CI= npm test
